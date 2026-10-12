@@ -41,7 +41,7 @@ docker compose -p guanpan -f compose.release.yaml pull
 docker compose -p guanpan -f compose.release.yaml up -d
 ```
 
-当前发布 **0.2.1**：升级按钮加入图标、边框、禁用状态和进度条；升级后自动刷新，并正确显示“已是最新”。已验证一次完整在线升级。
+当前发布 **0.2.2**：升级按钮加入图标、边框、禁用状态和进度条；升级后自动刷新，并正确显示“已是最新”。已验证完整在线升级。三个镜像并行检查版本，网络超时使用中文提示，成功后清除旧错误。
 
 ## 功能范围
 
