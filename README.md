@@ -2,7 +2,7 @@
 
 本页面仅提供 Docker 镜像、安装说明和更新记录。原源码仓库及其历史已删除，主项目源码不再上传到这里。
 
-[最新发布](https://github.com/taotaomo/guanpan/releases/latest) · [部署配置](https://github.com/taotaomo/guanpan/blob/main/compose.release.yaml)
+[一键部署](#一键部署) · [最新发布](https://github.com/taotaomo/guanpan/releases/latest) · [部署配置](https://github.com/taotaomo/guanpan/blob/main/compose.release.yaml)
 
 ## 三个镜像，一套软件
 
@@ -16,17 +16,98 @@
 
 公开镜像无需登录即可下载，支持 Linux amd64 与 arm64。升级管理服务复用行情采集镜像，因此四个运行容器仅使用三个镜像。
 
-## 安装
+## 一键部署
 
-先安装 Docker 与 Docker Compose，在一个空目录执行：
+**先安装并启动 Docker，随后复制下面整条命令到终端。** 不需要下载项目源码，不需要 GitHub 账号或令牌。
 
-```sh
-curl -fL https://raw.githubusercontent.com/taotaomo/guanpan/main/compose.release.yaml -o compose.release.yaml
-docker compose -p guanpan -f compose.release.yaml pull
-docker compose -p guanpan -f compose.release.yaml up -d
+- macOS / Windows：[安装 Docker Desktop](https://docs.docker.com/desktop/)。Windows 需使用 Linux 容器；一键命令可在 WSL 的 Bash 终端执行。
+- Linux 服务器：[安装 Docker Engine](https://docs.docker.com/engine/install/) 和 [Docker Compose 插件](https://docs.docker.com/compose/install/linux/)。当前用户需能执行 `docker info`。
+- 支持 Linux amd64 / arm64 镜像，需能访问 GitHub 与 GHCR。容器合计配置内存上限约 736 MiB，建议为 Docker 至少预留 1 GiB 可用内存。
+
+### macOS / Linux / Windows WSL
+
+```bash
+curl -fL --retry 3 https://raw.githubusercontent.com/taotaomo/guanpan/main/install.sh -o /tmp/guanpan-install.sh && bash /tmp/guanpan-install.sh
 ```
 
-打开 http://127.0.0.1:5188/ 。默认仅监听本机；数据保存在 Docker 数据卷。Pine 执行服务和升级服务不开放独立主机端口。升级服务使用 Docker socket，仅允许管理 `guanpan` 项目的三个指定组件；不要把页面公开到不可信网络。
+脚本默认安装到 `~/guanpan`，自动下载配置、拉取三个最新镜像、启动四个服务并等待健康检查。出现 **观盘部署成功** 后，在安装机器打开 **http://127.0.0.1:5188/** 。
+
+[查看一键脚本](https://github.com/taotaomo/guanpan/blob/main/install.sh)。重复运行会使用已有配置并保留数据；不会删除数据卷、清理其他 Docker 项目或覆盖已有 `.env`。安装到指定目录：
+
+```bash
+GUANPAN_DIR="$HOME/apps/guanpan" bash /tmp/guanpan-install.sh
+```
+
+若已经在其他目录运行观盘，优先使用原网页的在线升级；脚本会提示原部署目录，避免创建重复项目。首次安装不需要填写交易所密钥，公开行情即可使用。
+
+### Windows PowerShell
+
+安装并启动 Docker Desktop 后，打开 PowerShell 执行：
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\guanpan" | Out-Null
+Set-Location "$HOME\guanpan"
+if (!(Test-Path compose.release.yaml)) { Invoke-WebRequest "https://raw.githubusercontent.com/taotaomo/guanpan/main/compose.release.yaml" -OutFile compose.release.yaml }
+docker compose -p guanpan -f compose.release.yaml pull
+if ($LASTEXITCODE -ne 0) { throw "镜像下载失败，请检查网络" }
+docker compose -p guanpan -f compose.release.yaml up -d --wait --wait-timeout 180
+if ($LASTEXITCODE -ne 0) { throw "启动或健康检查失败，请查看容器日志" }
+```
+
+打开 **http://127.0.0.1:5188/**。已有其他目录的观盘项目请使用原目录及配置。
+
+### 远程服务器怎么访问
+
+在服务器执行一键部署命令后，在自己的电脑建立 SSH 隧道（将 `用户名@服务器IP` 替换为实际信息）：
+
+```bash
+ssh -N -L 5188:127.0.0.1:5188 用户名@服务器IP
+```
+
+保持此终端运行，在自己电脑的浏览器打开 **http://127.0.0.1:5188/**。如本机 5188 端口已被占用，可改成 `ssh -N -L 5189:127.0.0.1:5188 用户名@服务器IP`，再打开 `http://127.0.0.1:5189/`。
+
+默认网页仅监听本机，服务器无需开放 5188 公网端口。软件没有登录功能，不建议直接对公网开放。Pine 和升级服务不开放独立主机端口；升级服务挂载 Docker socket，仅管理观盘指定组件。
+
+### 手动部署
+
+在空目录执行：
+
+```bash
+curl -fL https://raw.githubusercontent.com/taotaomo/guanpan/main/compose.release.yaml -o compose.release.yaml
+docker compose -p guanpan -f compose.release.yaml pull
+docker compose -p guanpan -f compose.release.yaml up -d --wait --wait-timeout 180
+```
+
+请保留项目名 `guanpan`。默认部署不需要 `.env`；需要只读账户同步时，在服务端自行配置，切勿将密钥上传 GitHub。
+
+### 查看日志、停止和恢复
+
+在部署目录执行：
+
+```bash
+# 查看服务状态
+docker compose -p guanpan -f compose.release.yaml ps
+# 查看最近日志
+docker compose -p guanpan -f compose.release.yaml logs --tail 100
+# 停止服务，保留数据
+docker compose -p guanpan -f compose.release.yaml stop
+# 恢复服务
+docker compose -p guanpan -f compose.release.yaml up -d --wait --wait-timeout 180
+```
+
+**不要使用 `docker compose down -v`**，它会删除数据卷。浏览器工作区保存在浏览器，采集数据和后台任务保存在 Docker 数据卷；备份时两者都需要保留。
+
+### 常见部署问题
+
+| 提示或现象 | 处理方法 |
+| --- | --- |
+| 找不到 Docker / 无法连接 Docker | 安装并启动 Docker Desktop，或启动 Linux Docker 服务；确认当前终端能执行 `docker info` |
+| 不认识 `--wait` | 更新 Docker Compose 插件后重试 |
+| 无法拉取 GHCR 镜像 | 检查机器访问 GitHub / GHCR 的网络及 Docker 代理；镜像公开，无需登录 |
+| 5188 端口被占用 | 检查是否已有观盘实例，使用原实例或先处理端口冲突 |
+| 健康检查失败 | 查看上面的日志命令；修复后重新启动，脚本不会删除已有数据 |
+| 服务器部署成功但电脑打不开 | 按远程服务器说明建立 SSH 隧道；本地访问地址指向自己的电脑 |
+
 
 ## 在线升级
 
@@ -49,7 +130,7 @@ docker compose -p guanpan -f compose.release.yaml up -d
 
 ## 发布文件与许可证
 
-本仓库仅保留说明、Compose 配置和镜像同步工作流，没有主项目源码。Release 的自动生成 Source code 压缩包只包含上述发布文件。OCI 文件是镜像传输包，其中省略的公共基础层由发布流程补全，不能直接作为完整离线镜像导入。
+本仓库仅保留说明、一键部署脚本、Compose 配置和镜像同步工作流，没有主项目源码。Release 的自动生成 Source code 压缩包只包含上述发布文件。OCI 文件是镜像传输包，其中省略的公共基础层由发布流程补全，不能直接作为完整离线镜像导入。
 
 镜像保留第三方许可证。Pine 执行服务采用 AGPL-3.0-only；该组件对应源码随镜像提供，运行后可从 `/data/pine/source` 获取，不包含主网页或采集服务源码、账户密钥、数据库或私人脚本。
 
