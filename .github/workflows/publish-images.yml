@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 已上传镜像的发布版本
-        required: true
-        default: v0.2.0
+        description: 发布标签，留空使用最新发布
+        required: false
+        default: ''
 permissions:
   contents: read
   packages: write
@@ -20,7 +20,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
-          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.oci.tar' --pattern 'SHA256SUMS'
+          if [ -n "$RELEASE_TAG" ]; then
+            gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.oci.tar' --pattern 'SHA256SUMS'
+          else
+            gh release download --repo "$GITHUB_REPOSITORY" --pattern '*.oci.tar' --pattern 'SHA256SUMS'
+          fi
           sha256sum --check SHA256SUMS
       - name: 复用公共基础层并逐层校验完整镜像
         run: |
