@@ -22,6 +22,43 @@ jobs:
         run: |
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.oci.tar' --pattern 'SHA256SUMS'
           sha256sum --check SHA256SUMS
+      - name: 复用公共基础层并逐层校验完整镜像
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, pathlib, re, tarfile, urllib.request
+          for component in ('web','collector','pine-engine'):
+              root=pathlib.Path('oci-'+component)
+              root.mkdir(exist_ok=True)
+              with tarfile.open('guanpan-'+component+'.oci.tar') as archive:
+                  for member in archive.getmembers():
+                      if member.name not in ('oci-layout','index.json','blobs','blobs/sha256') and not re.fullmatch(r'blobs/sha256/[a-f0-9]{64}',member.name):
+                          raise ValueError('Unexpected OCI member')
+                      if not member.isfile() and not member.isdir(): raise ValueError('Unexpected OCI file type')
+                  archive.extractall(root,filter='data')
+              repo='taotaomo/guanpan-'+component
+              with urllib.request.urlopen('https://ghcr.io/token?service=ghcr.io&scope=repository:'+repo+':pull') as response:
+                  token=json.load(response)['token']
+              def blob(descriptor):
+                  digest=descriptor['digest']
+                  if not re.fullmatch(r'sha256:[a-f0-9]{64}',digest): raise ValueError('Invalid digest')
+                  path=root/'blobs'/'sha256'/digest[7:]
+                  if not path.exists():
+                      request=urllib.request.Request('https://ghcr.io/v2/'+repo+'/blobs/'+digest,headers={'Authorization':'Bearer '+token})
+                      with urllib.request.urlopen(request,timeout=120) as response:
+                          path.write_bytes(response.read())
+                  data=path.read_bytes()
+                  if hashlib.sha256(data).hexdigest()!=digest[7:]:raise ValueError('Image digest mismatch')
+                  return data
+              def complete(descriptor):
+                  value=json.loads(blob(descriptor))
+                  if 'manifests' in value:
+                      for item in value['manifests']: complete(item)
+                  else:
+                      blob(value['config'])
+                      for layer in value.get('layers',[]): blob(layer)
+              for descriptor in json.loads((root/'index.json').read_text())['manifests']: complete(descriptor)
+              print(component+' complete image verified')
+          PY
       - name: 安装镜像传输工具
         run: sudo apt-get update && sudo apt-get install -y skopeo
       - name: 将三个镜像同步至 GHCR
@@ -30,5 +67,5 @@ jobs:
           REGISTRY_TOKEN: ${{ github.token }}
         run: |
           for component in web collector pine-engine; do
-            skopeo copy --all --dest-creds "$REGISTRY_USER:$REGISTRY_TOKEN" "oci-archive:guanpan-$component.oci.tar" "docker://ghcr.io/taotaomo/guanpan-$component:latest"
+            skopeo copy --all --dest-creds "$REGISTRY_USER:$REGISTRY_TOKEN" "oci:oci-$component" "docker://ghcr.io/taotaomo/guanpan-$component:latest"
           done
