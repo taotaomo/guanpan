@@ -22,7 +22,7 @@
 
 - macOS / Windows：[安装 Docker Desktop](https://docs.docker.com/desktop/)。Windows 需使用 Linux 容器；一键命令可在 WSL 的 Bash 终端执行。
 - Linux 服务器：[安装 Docker Engine](https://docs.docker.com/engine/install/) 和 [Docker Compose 插件](https://docs.docker.com/compose/install/linux/)。当前用户需能执行 `docker info`。
-- 支持 Linux amd64 / arm64 镜像，需能访问 GitHub 与 GHCR。容器合计配置内存上限约 736 MiB，建议为 Docker 至少预留 1 GiB 可用内存。
+- 支持 Linux amd64 / arm64 镜像，需能访问 GitHub 与 GHCR。容器合计配置内存上限约 864 MiB，建议为 Docker 至少预留 1 GiB 可用内存。
 
 ### macOS / Linux / Windows WSL
 
@@ -122,11 +122,27 @@ docker compose -p guanpan -f compose.release.yaml pull
 docker compose -p guanpan -f compose.release.yaml up -d
 ```
 
-当前发布 **0.2.2**：升级按钮加入图标、边框、禁用状态和进度条；升级后自动刷新，并正确显示“已是最新”。已验证完整在线升级。三个镜像并行检查版本，网络超时使用中文提示，成功后清除旧错误。
+当前发布 **0.3.0**：加入 Lighter USDC 永续行情、手动委托与撤单，以及 SQLite 数据库管理、工作区自动保存和一致性备份。包含已开启指标置顶、价位标签避让、K线倒计时和当前价格线改进。
+
+## Lighter 下单与本地数据库
+
+[完整配置和使用说明](https://github.com/taotaomo/guanpan/blob/main/LIGHTER.md)
+
+页面右上角 **下单** 打开 Lighter 手动交易面板。支持 USDC 永续的限价、市价、仅挂单、仅减仓、委托预览、持仓查询和本工作台委托撤单。服务端使用官方 SDK 1.1.6，私钥不发送到浏览器。没有账户配置时可以查看行情及预览委托，真实提交按钮禁用。
+
+在部署目录的 `.env` 配置 `LIGHTER_ACCOUNT_INDEX`、`LIGHTER_API_KEY_INDEX`、`LIGHTER_API_KEY_PRIVATE_KEY`，并显式设置 `LIGHTER_TRADING_ENABLED=true`。仅使用 Lighter API 私钥，不填写钱包私钥或助记词；为本工作台使用独立 API 密钥索引。修改后运行：
+
+```bash
+docker compose -p guanpan -f compose.release.yaml up -d --no-deps --force-recreate collector
+```
+
+**工作台设置 → 常规 → 本地数据库** 可以查看 SQLite 状态、切换工作区自动保存、载入数据库工作区，以及一致性备份下载。数据库位于 `/data/workspace.sqlite`，持久保存在 `guanpan_liquidation-data` 数据卷中。任务、工作区、订单和持仓快照都在本机；数据库和账户密钥不会随镜像上传 GitHub。
+
+227 项测试与官方 SDK 离线签名验证通过；公开 Lighter 行情已实际验证。没有使用真实账户下单，配置账户后首次订单由使用者手动核对并确认。
 
 ## 功能范围
 
-中文界面与设置、主流交易所加密货币、17 档周期、常用技术指标、绘图、独立副图、Pine 5/6 实验兼容和后台 Webhook。无需登录，不提供下单功能。清算热力图为标注的估算；Pine 并非 TradingView 官方执行器，不能保证全部脚本完全兼容。
+中文界面与设置、主流交易所加密货币、17 档周期、常用技术指标、绘图、独立副图、Pine 5/6 实验兼容和后台 Webhook。无需登录，支持 Lighter 手动下单；交易默认关闭，配置服务端账户后由用户手动确认。清算热力图为标注的估算；Pine 并非 TradingView 官方执行器，不能保证全部脚本完全兼容。
 
 ## 发布文件与许可证
 
