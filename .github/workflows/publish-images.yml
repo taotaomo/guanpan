@@ -29,7 +29,7 @@ jobs:
       - name: 复用公共基础层并逐层校验完整镜像
         run: |
           python3 - <<'PY'
-          import hashlib, json, pathlib, re, tarfile, urllib.request
+          import hashlib, json, pathlib, re, tarfile, urllib.request, urllib.error
           for component in ('web','collector','pine-engine'):
               root=pathlib.Path('oci-'+component)
               root.mkdir(exist_ok=True)
@@ -42,14 +42,23 @@ jobs:
               repo='taotaomo/guanpan-'+component
               with urllib.request.urlopen('https://ghcr.io/token?service=ghcr.io&scope=repository:'+repo+':pull') as response:
                   token=json.load(response)['token']
+              with urllib.request.urlopen('https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/node:pull',timeout=30) as response:
+                  base_token=json.load(response)['token']
               def blob(descriptor):
                   digest=descriptor['digest']
                   if not re.fullmatch(r'sha256:[a-f0-9]{64}',digest): raise ValueError('Invalid digest')
                   path=root/'blobs'/'sha256'/digest[7:]
                   if not path.exists():
-                      request=urllib.request.Request('https://ghcr.io/v2/'+repo+'/blobs/'+digest,headers={'Authorization':'Bearer '+token})
-                      with urllib.request.urlopen(request,timeout=120) as response:
-                          path.write_bytes(response.read())
+                      sources=[('https://ghcr.io/v2/'+repo+'/blobs/'+digest,token),('https://registry-1.docker.io/v2/library/node/blobs/'+digest,base_token)]
+                      for address,read_token in sources:
+                          request=urllib.request.Request(address,headers={'Authorization':'Bearer '+read_token})
+                          try:
+                              with urllib.request.urlopen(request,timeout=120) as response:
+                                  path.write_bytes(response.read())
+                              break
+                          except urllib.error.HTTPError as error:
+                              if error.code not in (403,404): raise
+                      if not path.exists(): raise ValueError('Missing public image layer')
                   data=path.read_bytes()
                   if hashlib.sha256(data).hexdigest()!=digest[7:]:raise ValueError('Image digest mismatch')
                   return data
