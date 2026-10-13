@@ -32,9 +32,15 @@ services:
     networks: [default, pine-internal]
     image: ghcr.io/${GHCR_REPOSITORY:-taotaomo/guanpan}-collector:${IMAGE_TAG:-latest}
     restart: unless-stopped
-    mem_limit: 128m
+    mem_limit: 256m
     cpus: 0.5
     environment:
+      LIGHTER_NETWORK: ${LIGHTER_NETWORK:-mainnet}
+      LIGHTER_ACCOUNT_INDEX: ${LIGHTER_ACCOUNT_INDEX:-}
+      LIGHTER_API_KEY_INDEX: ${LIGHTER_API_KEY_INDEX:-3}
+      LIGHTER_API_KEY_PRIVATE_KEY: ${LIGHTER_API_KEY_PRIVATE_KEY:-}
+      LIGHTER_TRADING_ENABLED: ${LIGHTER_TRADING_ENABLED:-false}
+      LIGHTER_MAX_ORDER_USDC: ${LIGHTER_MAX_ORDER_USDC:-10000}
       PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-}
       BINANCE_READ_KEY: ${BINANCE_READ_KEY:-}
       BINANCE_READ_SECRET: ${BINANCE_READ_SECRET:-}
