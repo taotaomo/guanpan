@@ -5,8 +5,8 @@ services:
     user: "0:0"
     command: [node, updateServer.mjs]
     restart: unless-stopped
-    mem_limit: 96m
-    cpus: 0.5
+    mem_limit: 64m
+    cpus: 0.125
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - upgrade-data:/updates
@@ -21,8 +21,8 @@ services:
     ports:
       - "127.0.0.1:5188:80"
     restart: unless-stopped
-    mem_limit: 128m
-    cpus: 1.0
+    mem_limit: 96m
+    cpus: 0.125
     logging:
       driver: json-file
       options:
@@ -33,7 +33,7 @@ services:
     image: ghcr.io/${GHCR_REPOSITORY:-taotaomo/guanpan}-collector:${IMAGE_TAG:-latest}
     restart: unless-stopped
     mem_limit: 256m
-    cpus: 0.5
+    cpus: 0.25
     environment:
       LIGHTER_NETWORK: ${LIGHTER_NETWORK:-mainnet}
       LIGHTER_ACCOUNT_INDEX: ${LIGHTER_ACCOUNT_INDEX:-}
@@ -59,8 +59,9 @@ services:
   pine-engine:
     image: ghcr.io/${GHCR_REPOSITORY:-taotaomo/guanpan}-pine-engine:${IMAGE_TAG:-latest}
     restart: unless-stopped
-    mem_limit: 1536m
-    cpus: 1.0
+    mem_limit: 1152m
+    memswap_limit: 1152m
+    cpus: 1.5
     networks: [pine-internal]
     logging:
       driver: json-file
