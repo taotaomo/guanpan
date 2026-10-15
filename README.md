@@ -22,7 +22,7 @@
 
 - macOS / Windows：[安装 Docker Desktop](https://docs.docker.com/desktop/)。Windows 需使用 Linux 容器；一键命令可在 WSL 的 Bash 终端执行。
 - Linux 服务器：[安装 Docker Engine](https://docs.docker.com/engine/install/) 和 [Docker Compose 插件](https://docs.docker.com/compose/install/linux/)。当前用户需能执行 `docker info`。
-- 支持 Linux amd64 / arm64 镜像，需能访问 GitHub 与 GHCR。容器合计配置内存上限约 864 MiB，建议为 Docker 至少预留 1 GiB 可用内存。
+- 支持 Linux amd64 / arm64 镜像，需能访问 GitHub 与 GHCR。容器合计配置内存上限约 2016 MiB，建议为 Docker 至少预留 3 GiB 可用内存；大量K线回测需要更多可用内存与磁盘。
 
 ### macOS / Linux / Windows WSL
 
@@ -122,7 +122,16 @@ docker compose -p guanpan -f compose.release.yaml pull
 docker compose -p guanpan -f compose.release.yaml up -d
 ```
 
-当前发布 **0.3.12**：新增双重平滑随机指标（DSS Bressert），参考 [HPotter公开脚本](https://cn.tradingview.com/script/W9J3VZUu-DSS-Bressert-Double-Smoothed-Stochastic/)。独立副图、蓝色主线与红色信号线，默认随机周期10、平滑9、信号5、超买80/超卖20、数据周期1小时；支持中文参数和样式、17档数据周期或跟随图表。先跨周期合并高低收盘价，再计算两次随机及指数平滑。未收线数值会变化，范围受已加载历史限制。414项测试、类型检查和生产构建通过，实际页面验证添加、参数保存和刷新保留。
+当前发布 **0.3.14**：新增一周、一个月、半年、一年、全部时间及自定义区间回测；默认全部可用历史。区间作用于实际引擎输入，从初始资金重新运行，指标从区间内预热。K线在本地SQLite缓存24小时，移除10000根/100页限制；仍受上游历史和本机执行资源约束。曲线统一顶部统计、底部时间标签，支持滚轮缩放、缩放后拖动平移、双击复位，拖动面板顶部调整高度。修复后台自动刷新覆盖区间结果，包含成交后重算、补仓和追踪止盈兼容修复。445项测试通过。OHLC模拟不等于真实逐笔成交，不承诺所有Pine脚本与TradingView一致。
+
+旧版部署若仍把 Pine 服务限制为384 MiB，可在线升级镜像，但大量历史回测可能内存不足。请先备份原配置，在**原部署目录**下载最新配置后执行以下命令，保留原数据卷和账户设置；如有自行修改的端口或环境变量，请先合并到新配置：
+
+```sh
+cp compose.release.yaml compose.release.yaml.bak
+curl -fL https://raw.githubusercontent.com/taotaomo/guanpan/main/compose.release.yaml -o compose.release.yaml
+docker compose -p guanpan -f compose.release.yaml pull
+docker compose -p guanpan -f compose.release.yaml up -d --wait --wait-timeout 180
+```
 
 ## Lighter 下单与本地数据库
 
